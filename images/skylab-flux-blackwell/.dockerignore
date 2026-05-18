@@ -1,0 +1,60 @@
+# Never include credentials, local caches, or model weights in the build context.
+
+# Python artifacts
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# HuggingFace / model caches
+.cache/
+*.cache/
+huggingface/
+*.safetensors
+*.bin
+*.gguf
+*.ggml
+
+# Secrets and credentials
+.env
+.env.*
+*.pem
+*.key
+*.token
+id_rsa
+id_ed25519
+credentials.json
+secrets/
+
+# Local outputs
+outputs/
+oliver-studio-outputs/
+*.png
+*.jpg
+*.jpeg
+
+# VCS
+.git/
+.gitignore
+
+# Editor / OS
+.DS_Store
+*.swp
+*.swo
+.idea/
+.vscode/
+
+# Docs / test artifacts (not needed in image context)
+*.md
+tests/
+test/

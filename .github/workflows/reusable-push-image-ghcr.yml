@@ -1,0 +1,203 @@
+# Reusable GHCR image publisher.
+#
+# Add a new public image by creating a small per-image workflow that calls this
+# template with image_name, context, dockerfile, and platforms.
+
+name: Reusable - Push image to GHCR
+
+on:
+  workflow_call:
+    inputs:
+      image_name:
+        description: "GHCR package name without owner, e.g. skylab-flux-blackwell."
+        required: true
+        type: string
+      context:
+        description: "Docker build context, e.g. images/skylab-flux-blackwell."
+        required: true
+        type: string
+      dockerfile:
+        description: "Path to the Dockerfile."
+        required: true
+        type: string
+      platforms:
+        description: "Comma-separated target platforms."
+        required: false
+        default: "linux/amd64"
+        type: string
+      extra_tag:
+        description: "Extra tag to apply, e.g. v1.0.0."
+        required: false
+        default: ""
+        type: string
+
+env:
+  REGISTRY: ghcr.io
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+jobs:
+  build-push:
+    name: Build ${{ inputs.platforms }} -> GHCR
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    permissions:
+      contents: read
+      packages: write
+
+    outputs:
+      digest: ${{ steps.build-push.outputs.digest }}
+      image: ${{ steps.meta.outputs.image }}
+      image_ref: ${{ steps.meta.outputs.image }}@${{ steps.build-push.outputs.digest }}
+      package: ${{ steps.meta.outputs.package }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compute image metadata
+        id: meta
+        shell: bash
+        run: |
+          OWNER="$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')"
+          PACKAGE="$(echo "${{ inputs.image_name }}" | tr '[:upper:]' '[:lower:]')"
+          IMAGE="${{ env.REGISTRY }}/${OWNER}/${PACKAGE}"
+          DATE="$(date -u +%Y%m%d)"
+          SHA="${{ github.sha }}"
+
+          TAGS="${IMAGE}:sha-${SHA}"$'\n'"${IMAGE}:${DATE}"$'\n'"${IMAGE}:latest"
+
+          EXTRA="${{ inputs.extra_tag }}"
+          if [[ -n "${EXTRA}" ]]; then
+            TAGS="${TAGS}"$'\n'"${IMAGE}:${EXTRA}"
+          fi
+
+          {
+            echo "tags<<EOF"
+            echo "${TAGS}"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+          echo "date=${DATE}" >> "$GITHUB_OUTPUT"
+          echo "image=${IMAGE}" >> "$GITHUB_OUTPUT"
+          echo "package=${PACKAGE}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push
+        id: build-push
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ inputs.context }}
+          file: ${{ inputs.dockerfile }}
+          platforms: ${{ inputs.platforms }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          cache-from: type=gha,scope=${{ steps.meta.outputs.package }}
+          cache-to: type=gha,mode=max,scope=${{ steps.meta.outputs.package }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.created=${{ steps.meta.outputs.date }}
+            org.opencontainers.image.url=${{ github.server_url }}/${{ github.repository }}/pkgs/container/${{ steps.meta.outputs.package }}
+
+      - name: Output image digest
+        shell: bash
+        run: |
+          echo "### ${{ inputs.image_name }} build" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Field | Value |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|---|---|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Image | \`${{ steps.meta.outputs.image }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Digest | \`${{ steps.build-push.outputs.digest }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| SHA tag | \`sha-${{ github.sha }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Date tag | \`${{ steps.meta.outputs.date }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          EXTRA="${{ inputs.extra_tag }}"
+          if [[ -n "${EXTRA}" ]]; then
+            echo "| Extra tag | \`${EXTRA}\` |" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Pull command:" >> "$GITHUB_STEP_SUMMARY"
+          echo "\`\`\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "docker pull ${{ steps.meta.outputs.image }}@${{ steps.build-push.outputs.digest }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "\`\`\`" >> "$GITHUB_STEP_SUMMARY"
+
+  sbom:
+    name: Generate SBOM
+    needs: build-push
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    permissions:
+      contents: read
+      packages: read
+
+    steps:
+      - name: Log in to GHCR (read)
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate SPDX SBOM with Syft
+        uses: anchore/sbom-action@v0
+        with:
+          image: ${{ needs.build-push.outputs.image_ref }}
+          artifact-name: sbom-${{ needs.build-push.outputs.package }}-${{ github.sha }}.spdx.json
+          output-file: sbom.spdx.json
+          format: spdx-json
+
+  scan:
+    name: Trivy vulnerability scan
+    needs: build-push
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    permissions:
+      contents: read
+      packages: read
+      security-events: write
+
+    steps:
+      - name: Log in to GHCR (read)
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Trivy scan - CRITICAL (fail)
+        uses: aquasecurity/trivy-action@0.31.0
+        with:
+          image-ref: ${{ needs.build-push.outputs.image_ref }}
+          format: table
+          severity: CRITICAL
+          exit-code: "1"
+          ignore-unfixed: true
+
+      - name: Trivy scan - HIGH + below (warn, SARIF)
+        if: always()
+        uses: aquasecurity/trivy-action@0.31.0
+        with:
+          image-ref: ${{ needs.build-push.outputs.image_ref }}
+          format: sarif
+          output: trivy-results.sarif
+          severity: HIGH,MEDIUM
+          exit-code: "0"
+          ignore-unfixed: true
+
+      - name: Upload SARIF to GitHub Security
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-results.sarif
+          category: trivy-${{ needs.build-push.outputs.package }}

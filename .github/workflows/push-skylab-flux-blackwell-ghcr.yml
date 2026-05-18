@@ -1,0 +1,55 @@
+# Build and push skylab-flux-blackwell to GitHub Container Registry (GHCR).
+#
+# Image: ghcr.io/<owner>/skylab-flux-blackwell
+# Target: linux/amd64, Blackwell GPU workloads (RTX5090, RTXPRO6000WS)
+#
+# Auth: only GITHUB_TOKEN is required — no external secrets.
+# After first push, make the package public:
+#   github.com/<owner> → Packages → skylab-flux-blackwell → Package settings → Public
+#
+# Tags produced on every push to main:
+#   sha-<full-git-sha>          immutable build pin
+#   YYYYMMDD                    date tag for "what ran today"
+#   latest                      floating convenience tag
+# Additional tag from workflow_dispatch input:
+#   <semver>                    e.g. v1.0.0
+#
+# To add another image, copy this per-image wrapper and point it at the new
+# images/<name> directory. The build, push, SBOM, and scan jobs live in
+# reusable-push-image-ghcr.yml.
+
+name: Push skylab-flux-blackwell to GHCR
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "images/skylab-flux-blackwell/**"
+      - ".github/workflows/push-skylab-flux-blackwell-ghcr.yml"
+      - ".github/workflows/reusable-push-image-ghcr.yml"
+  workflow_dispatch:
+    inputs:
+      extra_tag:
+        description: "Extra tag to apply (e.g. v1.0.0). Leave blank to skip."
+        required: false
+        default: ""
+
+concurrency:
+  group: ghcr-skylab-flux-blackwell-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write         # push to GHCR
+  security-events: write  # upload Trivy SARIF to GitHub Security tab
+
+jobs:
+  push-image:
+    name: Build, scan, and publish
+    uses: ./.github/workflows/reusable-push-image-ghcr.yml
+    with:
+      image_name: skylab-flux-blackwell
+      context: images/skylab-flux-blackwell
+      dockerfile: images/skylab-flux-blackwell/Dockerfile
+      platforms: linux/amd64
+      extra_tag: ${{ inputs.extra_tag || '' }}

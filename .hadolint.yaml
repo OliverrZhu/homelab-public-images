@@ -1,0 +1,14 @@
+# hadolint configuration — https://github.com/hadolint/hadolint#configure
+#
+# DL3008  apt-get without pinned versions: acceptable for a runtime base image;
+#         CUDA image version is the effective pin.
+# DL3013  pip install without pinned version: torch nightly and diffusers@git are
+#         intentionally unpinned; the image digest serves as the reproducibility pin.
+# DL3059  multiple consecutive RUN instructions: kept for layer-cache clarity.
+
+ignore:
+  - DL3008
+  - DL3013
+  - DL3059
+
+failure-threshold: error

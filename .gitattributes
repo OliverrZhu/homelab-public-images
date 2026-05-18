@@ -1,0 +1,17 @@
+# Normalize line endings on checkin
+* text=auto eol=lf
+
+# Binary assets — never mangle
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary
+
+# ML weight files (should never be committed, but guard anyway)
+*.safetensors binary
+*.bin         binary
+*.gguf        binary
+*.ggml        binary
+*.pt          binary
+*.pth         binary
