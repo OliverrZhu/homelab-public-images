@@ -13,13 +13,13 @@
 # digest, not to a specific nightly wheel date.
 #
 # To pin the base digest, run on a linux/amd64 host:
-#   docker pull --platform linux/amd64 nvcr.io/nvidia/cuda:12.8.1-cudnn9-runtime-ubuntu22.04
-#   docker inspect --format='{{index .RepoDigests 0}}' nvcr.io/nvidia/cuda:12.8.1-cudnn9-runtime-ubuntu22.04
+#   docker pull --platform linux/amd64 nvidia/cuda:12.8.1-cudnn-runtime-ubuntu22.04
+#   docker inspect --format='{{index .RepoDigests 0}}' nvidia/cuda:12.8.1-cudnn-runtime-ubuntu22.04
 # Then append @sha256:<digest> to the FROM line and update BASE_IMAGE_DIGEST in
 # the GHA workflow for documentation parity.
 # -------------------------------------------------------------------------------
 
-ARG CUDA_IMAGE=nvcr.io/nvidia/cuda:12.8.1-cudnn9-runtime-ubuntu22.04
+ARG CUDA_IMAGE=nvidia/cuda:12.8.1-cudnn-runtime-ubuntu22.04
 FROM ${CUDA_IMAGE}
 
 # Propagate after FROM so ARG is visible to RUN steps below.

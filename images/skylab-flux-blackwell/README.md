@@ -8,7 +8,7 @@ Public GHCR image for running [FLUX.2-klein-4B](https://huggingface.co/black-for
 
 | Layer | Detail |
 |---|---|
-| Base | `nvcr.io/nvidia/cuda:12.8.1-cudnn9-runtime-ubuntu22.04` (CUDA 12.8, cuDNN 9) |
+| Base | `nvidia/cuda:12.8.1-cudnn-runtime-ubuntu22.04` (CUDA 12.8, cuDNN 9) |
 | Python | 3.11 (system package) |
 | PyTorch | nightly `cu128` — includes SM 100/120 (Blackwell) kernels |
 | ML libs | `transformers>=4.44`, `accelerate`, `sentencepiece`, `protobuf`, `huggingface_hub` |
@@ -118,8 +118,8 @@ Update the `ARG CUDA_IMAGE` line in the Dockerfile and the equivalent comment in
 
 To find the current linux/amd64 digest:
 ```bash
-docker pull --platform linux/amd64 nvcr.io/nvidia/cuda:12.8.1-cudnn9-runtime-ubuntu22.04
-docker inspect --format='{{index .RepoDigests 0}}' nvcr.io/nvidia/cuda:12.8.1-cudnn9-runtime-ubuntu22.04
+docker pull --platform linux/amd64 nvidia/cuda:12.8.1-cudnn-runtime-ubuntu22.04
+docker inspect --format='{{index .RepoDigests 0}}' nvidia/cuda:12.8.1-cudnn-runtime-ubuntu22.04
 ```
 
 ## SkyPilot task integration
