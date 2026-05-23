@@ -176,7 +176,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Trivy scan - CRITICAL (fail)
-        uses: aquasecurity/trivy-action@0.31.0
+        uses: aquasecurity/trivy-action@v0.35.0
         with:
           image-ref: ${{ needs.build-push.outputs.image_ref }}
           format: table
@@ -186,7 +186,7 @@ jobs:
 
       - name: Trivy scan - HIGH + below (warn, SARIF)
         if: always()
-        uses: aquasecurity/trivy-action@0.31.0
+        uses: aquasecurity/trivy-action@v0.35.0
         with:
           image-ref: ${{ needs.build-push.outputs.image_ref }}
           format: sarif
